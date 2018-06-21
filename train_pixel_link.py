@@ -122,6 +122,7 @@ def create_dataset_batch_queue(dataset):
                                                          'object/oriented_bbox/y3',
                                                          'object/oriented_bbox/y4'
                                                          ])
+        tf.logging.info("I'm in create_dataset_batch_queue")
         gxs = tf.transpose(tf.stack([x1, x2, x3, x4])) #shape = (N, 4)
         gys = tf.transpose(tf.stack([y1, y2, y3, y4]))
         image = tf.identity(image, 'input_image')

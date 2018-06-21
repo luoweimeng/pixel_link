@@ -38,8 +38,8 @@ max_shorter_side = np.infty
 #=====================================================================
 #====================Post-processing params START=====================
 decode_method = pixel_link.DECODE_METHOD_join
-min_area = 300
-min_height = 10
+min_area = 600
+min_height = 15
 #====================Post-processing params END=======================
 #=====================================================================
 
@@ -102,6 +102,7 @@ global num_neighbours
 
 global pixel_conf_threshold
 global link_conf_threshold
+global updown_link_conf_threshold
 
 def _set_weight_decay(wd):
     global weight_decay
@@ -124,12 +125,14 @@ def _set_batch_size(bz):
     global batch_size
     batch_size = bz
 
-def _set_seg_th(pixel_conf_th, link_conf_th):
+def _set_seg_th(pixel_conf_th, link_conf_th, updown_link_conf_th):
     global pixel_conf_threshold
     global link_conf_threshold
+    global updown_link_conf_threshold
     
     pixel_conf_threshold = pixel_conf_th
     link_conf_threshold = link_conf_th
+    updown_link_conf_threshold = updown_link_conf_th
     
     
 def  _set_train_with_ignored(train_with_ignored_):
@@ -141,8 +144,9 @@ def init_config(image_shape, batch_size = 1,
                 weight_decay = 0.0005, 
                 num_gpus = 1, 
                 pixel_conf_threshold = 0.6,
-                link_conf_threshold = 0.9):
-    _set_seg_th(pixel_conf_threshold, link_conf_threshold)
+                link_conf_threshold = 0.9,
+                updown_link_conf_threshold = 0.9):
+    _set_seg_th(pixel_conf_threshold, link_conf_threshold, updown_link_conf_threshold)
     _set_weight_decay(weight_decay)
     _set_image_shape(image_shape)
 

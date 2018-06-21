@@ -11,7 +11,9 @@ from tf_extended import metrics as tfe_metrics
 import util
 import cv2
 import pixel_link
+import os
 from nets import pixel_link_symbol
+import cPickle
 
 
 slim = tf.contrib.slim
@@ -26,6 +28,9 @@ tf.app.flags.DEFINE_string('checkpoint_path', None,
 tf.app.flags.DEFINE_float('gpu_memory_fraction', -1, 
   'the gpu memory fraction to be used. If less than 0, allow_growth = True is used.')
 
+tf.app.flags.DEFINE_string('output_path', None,
+   'the path of the output pictures.')
+
 
 # =========================================================================== #
 # Dataset Flags.
@@ -38,6 +43,7 @@ tf.app.flags.DEFINE_integer('eval_image_width', None, 'resized image width for i
 tf.app.flags.DEFINE_integer('eval_image_height',  None, 'resized image height for inference')
 tf.app.flags.DEFINE_float('pixel_conf_threshold',  None, 'threshold on the pixel confidence')
 tf.app.flags.DEFINE_float('link_conf_threshold',  None, 'threshold on the link confidence')
+tf.app.flags.DEFINE_float('updown_link_conf_threshold',  None, 'threshold on the updown link confidence')
 
 
 tf.app.flags.DEFINE_bool('using_moving_average', True, 
@@ -50,7 +56,12 @@ FLAGS = tf.app.flags.FLAGS
 
 def config_initialization():
     # image shape and feature layers shape inference
+    print(FLAGS.checkpoint_path)
+    print(FLAGS.eval_image_height)
+    print(FLAGS.eval_image_width)
+    # print(FLAGS.updown_link_conf_threshold)
     image_shape = (FLAGS.eval_image_height, FLAGS.eval_image_width)
+    print(image_shape)
     
     if not FLAGS.dataset_dir:
         raise ValueError('You must supply the dataset directory with --dataset_dir')
@@ -61,12 +72,14 @@ def config_initialization():
                        batch_size = 1, 
                        pixel_conf_threshold = FLAGS.pixel_conf_threshold,
                        link_conf_threshold = FLAGS.link_conf_threshold,
+                       updown_link_conf_threshold = FLAGS.updown_link_conf_threshold,
                        num_gpus = 1, 
                    )
 
 
 def test():
     checkpoint_dir = util.io.get_dir(FLAGS.checkpoint_path)
+    output_dir = FLAGS.output_path
     
     global_step = slim.get_or_create_global_step()
     with tf.name_scope('evaluation_%dx%d'%(FLAGS.eval_image_height, FLAGS.eval_image_width)):
@@ -108,11 +121,22 @@ def test():
         files = util.io.ls(FLAGS.dataset_dir)
         
         for image_name in files:
+
+            if os.path.isfile(os.path.join(output_dir, image_name+".png")):
+                continue
+
             file_path = util.io.join_path(FLAGS.dataset_dir, image_name)
             image_data = util.img.imread(file_path)
             link_scores, pixel_scores, mask_vals = sess.run(
                     [net.link_pos_scores, net.pixel_pos_scores, masks],
                     feed_dict = {image: image_data})
+
+            f = open(os.path.join('pkl', image_name) + '.pkl', 'wb')
+            cPickle.dump(link_scores, f, protocol=-1)
+            cPickle.dump(pixel_scores, f, protocol=-1)
+            cPickle.dump(mask_vals, f, protocol=-1)
+            f.close()
+
             h, w, _ =image_data.shape
             def resize(img):
                 return util.img.resize(img, size = (w, h), 
@@ -126,20 +150,24 @@ def test():
                     points = np.reshape(bbox, [4, 2])
                     cnts = util.img.points_to_contours(points)
                     util.img.draw_contours(img, contours = cnts, 
-                           idx = -1, color = color, border_width = 1)
+                           idx = -1, color = color, border_width = 4)
             image_idx = 0
             pixel_score = pixel_scores[image_idx, ...]
             mask = mask_vals[image_idx, ...]
 
             bboxes_det = get_bboxes(mask)
-            
+
             mask = resize(mask)
             pixel_score = resize(pixel_score)
 
             draw_bboxes(image_data, bboxes_det, util.img.COLOR_RGB_RED)
 #             print util.sit(pixel_score)
 #             print util.sit(mask)
-            print util.sit(image_data)
+#             output_dir = os.path.join("test_output",'%.1f'%FLAGS.pixel_conf_threshold+"_"+'%.1f'%FLAGS.pixel_conf_threshold)
+
+            if not os.path.exists(output_dir):
+                os.mkdir(output_dir)
+            print util.sit(image_data, format='bgr', path=os.path.join(output_dir, image_name+".png"))
                 
         
 def main(_):

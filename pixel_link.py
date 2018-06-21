@@ -243,7 +243,7 @@ def tf_decode_score_map_to_mask_in_batch(pixel_cls_scores, pixel_link_scores):
     
 
 def decode_batch(pixel_cls_scores, pixel_link_scores, 
-                 pixel_conf_threshold = None, link_conf_threshold = None):
+                 pixel_conf_threshold = None, link_conf_threshold = None, updown_link_conf_threshold = None):
     import config
     
     if pixel_conf_threshold is None:
@@ -251,6 +251,9 @@ def decode_batch(pixel_cls_scores, pixel_link_scores,
     
     if link_conf_threshold is None:
         link_conf_threshold = config.link_conf_threshold
+
+    if updown_link_conf_threshold is None:
+        updown_link_conf_threshold = config.updown_link_conf_threshold
     
     batch_size = pixel_cls_scores.shape[0]
     batch_mask = []
@@ -259,7 +262,7 @@ def decode_batch(pixel_cls_scores, pixel_link_scores,
         image_pos_link_scores = pixel_link_scores[image_idx, :, :, :]    
         mask = decode_image(
             image_pos_pixel_scores, image_pos_link_scores, 
-            pixel_conf_threshold, link_conf_threshold
+            pixel_conf_threshold, link_conf_threshold, updown_link_conf_threshold
         )
         batch_mask.append(mask)
     return np.asarray(batch_mask, np.int32)
@@ -267,11 +270,11 @@ def decode_batch(pixel_cls_scores, pixel_link_scores,
 # @util.dec.print_calling_in_short
 # @util.dec.timeit
 def decode_image(pixel_scores, link_scores, 
-                 pixel_conf_threshold, link_conf_threshold):
+                 pixel_conf_threshold, link_conf_threshold, updown_link_conf_threshold):
     import config
     if config.decode_method == DECODE_METHOD_join:
         mask =  decode_image_by_join(pixel_scores, link_scores, 
-                 pixel_conf_threshold, link_conf_threshold)
+                 pixel_conf_threshold, link_conf_threshold, updown_link_conf_threshold)
         return mask
     elif config.decode_method == DECODE_METHOD_border_split:
         return decode_image_by_border(pixel_scores, link_scores, 
@@ -319,7 +322,7 @@ def rect_to_xys(rect, image_shape):
         return y
     
     rect = ((rect[0], rect[1]), (rect[2], rect[3]), rect[4])
-    points = cv2.cv.BoxPoints(rect)
+    points = cv2.boxPoints(rect)
     points = np.int0(points)
     for i_xy, (x, y) in enumerate(points):
         x = get_valid_x(x)
