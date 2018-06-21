@@ -20,6 +20,18 @@ icdar2015 = DatasetConfig(
             'test': 500
         }
 )
+icdar2017 = DatasetConfig(
+        file_pattern = 'icdar2017_*.tfrecord',
+        split_sizes = {
+            'part1': 1000,
+            'part2': 1000,
+            'part3': 1000,
+            'part4': 1425,
+            'part5': 1500,
+            'part6': 2109,
+            'train': 8034
+        }
+)
 td500 = DatasetConfig(
         file_pattern = '*_%s.tfrecord', 
         split_sizes = {

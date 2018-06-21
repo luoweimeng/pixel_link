@@ -1,4 +1,6 @@
 #encoding=utf-8
+# Transfer icdar2017(RCTW) dataset to tfrecords
+# http://www.icdar2017chinese.site:5080/
 import numpy as np;
 import tensorflow as tf
 import util
@@ -34,19 +36,24 @@ def cvt_to_tfrecords(output_path , data_path, gt_path):
                 gt = util.str.split(line, ',');
                 oriented_box = [int(gt[i]) for i in range(8)];
                 oriented_box = np.asarray(oriented_box) / ([w, h] * 4);
-                oriented_bboxes.append(oriented_box);
                 
                 xs = oriented_box.reshape(4, 2)[:, 0]                
                 ys = oriented_box.reshape(4, 2)[:, 1]
                 xmin = xs.min()
-                xmin = np.max([0, xmin])
                 xmax = xs.max()
-                xmax = np.min([1, xmax])
                 ymin = ys.min()
-                ymin = np.max([0, ymin])
                 ymax = ys.max()
+                # If xmin, ymin is less than 0, set it to 0. If xmax, ymax is larger than 1, set it to 1.
+                xmin = np.max([0, xmin])
+                xmax = np.min([1, xmax])
+                ymin = np.max([0, ymin])
                 ymax = np.min([1, ymax])
+                # Check whether the bounding box is out of boundary! (There is some invalid bbox in icdar2017 data)
+                if xmin > 1.0 or ymin > 1.0 or xmax < 0 or ymax < 0:
+                    print("Bounding box out of boundary!")
+                    continue
                 bboxes.append([xmin, ymin, xmax, ymax])
+                oriented_bboxes.append(oriented_box);
 
                 # might be wrong here, but it doesn't matter because the label is not going to be used in detection
                 labels_text.append(gt[-1]); 
