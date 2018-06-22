@@ -14,6 +14,7 @@ import pixel_link
 import os
 from nets import pixel_link_symbol
 import cPickle
+import time
 
 
 slim = tf.contrib.slim
@@ -53,6 +54,14 @@ tf.app.flags.DEFINE_float('moving_average_decay', 0.9999,
 
 
 FLAGS = tf.app.flags.FLAGS
+
+
+def resize_im(im, scale, max_scale=None):
+    f=float(scale)/min(im.shape[0], im.shape[1])
+    if max_scale!=None and f*max(im.shape[0], im.shape[1])>max_scale:
+        f=float(max_scale)/max(im.shape[0], im.shape[1])
+    return cv2.resize(im, None,None, fx=f, fy=f,interpolation=cv2.INTER_LINEAR), f
+
 
 def config_initialization():
     # image shape and feature layers shape inference
@@ -127,10 +136,14 @@ def test():
 
             file_path = util.io.join_path(FLAGS.dataset_dir, image_name)
             image_data = util.img.imread(file_path)
+
+            image_data, scale = resize_im(image_data, scale=768, max_scale=1280)
+
+            start_tf_time = time.time()
             link_scores, pixel_scores, mask_vals = sess.run(
                     [net.link_pos_scores, net.pixel_pos_scores, masks],
                     feed_dict = {image: image_data})
-
+            end_tf_time = time.time()
             f = open(os.path.join('pkl', image_name) + '.pkl', 'wb')
             cPickle.dump(link_scores, f, protocol=-1)
             cPickle.dump(pixel_scores, f, protocol=-1)
@@ -154,8 +167,12 @@ def test():
             image_idx = 0
             pixel_score = pixel_scores[image_idx, ...]
             mask = mask_vals[image_idx, ...]
-
+            start_post_time = time.time()
             bboxes_det = get_bboxes(mask)
+            end_post_time = time.time()
+
+            print("Tensorflow inference time:", end_tf_time - start_tf_time)
+            print("Post filtering time:", end_post_time - start_post_time)
 
             mask = resize(mask)
             pixel_score = resize(pixel_score)
