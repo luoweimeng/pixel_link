@@ -30,6 +30,22 @@ def resize_im(im, scale, max_scale=None):
     return cv2.resize(im, None,None, fx=f, fy=f,interpolation=cv2.INTER_LINEAR), f
 
 
+class pixel_link_test(object):
+    def __init__(self):
+        self.image = tf.placeholder(dtype=tf.int32, shape=[None, None, 3])
+        image_shape = tf.placeholder(dtype=tf.int32, shape=[3, ])
+        processed_image, _, _, _, _ = ssd_vgg_preprocessing.preprocess_image(self.image, None, None, None, None,
+                                                                             out_shape=(768, 768),
+                                                                             data_format='NHWC',
+                                                                             is_training=False)
+        b_image = tf.expand_dims(processed_image, axis=0)
+
+        # build model and loss
+        self.net = pixel_link_symbol.PixelLinkNet(b_image, is_training=False)
+        self.masks = pixel_link.tf_decode_score_map_to_mask_in_batch(
+            self.net.pixel_pos_scores, self.net.link_pos_scores)
+
+
 def config_initialization(eval_image_height, eval_image_width,
                           pixel_conf_threshold, link_conf_threshold, updown_link_conf_threshold):
     # image shape and feature layers shape inference
@@ -51,53 +67,52 @@ def config_initialization(eval_image_height, eval_image_width,
                        num_gpus=1,
                        )
 
-class pixelLinkDetector(object):
-    def __init__(self, checkpoint_dir, eval_image_height, eval_image_width,
+
+def load_pixel_link_model(checkpoint_dir, eval_image_height, eval_image_width,
                  pixel_conf_threshold, link_conf_threshold, updown_link_conf_threshold):
 
-        config_initialization(eval_image_height, eval_image_width,
-                              pixel_conf_threshold, link_conf_threshold, updown_link_conf_threshold)
-        global_step = slim.get_or_create_global_step()
+    global_step = slim.get_or_create_global_step()
+    config_initialization(eval_image_height, eval_image_width,
+                          pixel_conf_threshold, link_conf_threshold, updown_link_conf_threshold)
 
-        self.graph = tf.Graph()
-        with self.graph.as_default():
-            self.sess = tf.Session(graph=self.graph)
-            # Construct the graph
-            with tf.name_scope('evaluation_%dx%d' % (eval_image_height, eval_image_width)):
-                with tf.variable_scope(tf.get_variable_scope(), reuse=False):
-                    self.image = tf.placeholder(dtype=tf.int32, shape=[None, None, 3])
-                    image_shape = tf.placeholder(dtype=tf.int32, shape=[3, ])
-                    processed_image, _, _, _, _ = ssd_vgg_preprocessing.preprocess_image(self.image, None, None, None, None,
-                                                                                         out_shape=(768, 768),
-                                                                                         data_format='NHWC',
-                                                                                         is_training=False)
-                    b_image = tf.expand_dims(processed_image, axis=0)
+    graph = tf.Graph()
+    with graph.as_default():
+        sess = tf.Session(graph=graph)
+        # Construct the graph
+        pl_net = pixel_link_test()
 
-                    # build model and loss
-                    self.net = pixel_link_symbol.PixelLinkNet(b_image, is_training=False)
-                    self.masks = pixel_link.tf_decode_score_map_to_mask_in_batch(
-                        self.net.pixel_pos_scores, self.net.link_pos_scores)
+        variables_to_restore = slim.get_variables_to_restore()
+        saver = tf.train.Saver(var_list=variables_to_restore)
 
-            variables_to_restore = slim.get_variables_to_restore()
-            self.saver = tf.train.Saver(var_list=variables_to_restore)
+        ckpt = checkpoint_dir
+        print(ckpt)
+        if ckpt:
+            saver.restore(sess, ckpt)
+            print(checkpoint_dir, "Restore Success!")
 
-            ckpt = checkpoint_dir
-            print(ckpt)
-            if ckpt:
-                self.saver.restore(self.sess, ckpt)
-                print(checkpoint_dir, "Restore Success!")
+    return sess, pl_net
 
-    def detect(self, image_path):
-        with self.graph.as_default():
-            self.image_data = cv2.imread(image_path, cv2.IMREAD_COLOR)
 
-            self.image_data, scale = resize_im(self.image_data, scale=768, max_scale=1280)
+sess, pl_net = load_pixel_link_model("train/ic17_whole/model.ckpt-200000", 768, 768, 0.5, 0.7, 0.8)
 
-            link_scores, pixel_scores, mask_vals = self.sess.run(
-                [self.net.link_pos_scores, self.net.pixel_pos_scores, self.masks],
-                feed_dict={self.image: self.image_data})
 
-            h, w, _ = self.image_data.shape
+class pixelLinkDetector(object):
+    def __init__(self, image_path):
+        self.image_data = cv2.imread(image_path, cv2.IMREAD_COLOR)
+
+        self.image_data, scale = resize_im(self.image_data, scale=768, max_scale=1280)
+
+
+    def detect(self):
+        """
+
+        :return: list of bounding boxes 左上 右上 左下 右下
+        """
+        graph = tf.Graph()
+        with graph.as_default():
+            self.link_scores, self.pixel_scores, self.mask_vals = sess.run(
+                [pl_net.net.link_pos_scores, pl_net.net.pixel_pos_scores, pl_net.masks],
+                feed_dict={pl_net.image: self.image_data})
 
 
             def get_bboxes(mask):
@@ -105,15 +120,24 @@ class pixelLinkDetector(object):
 
 
             image_idx = 0
-            pixel_score = pixel_scores[image_idx, ...]
-            mask = mask_vals[image_idx, ...]
+            pixel_score = self.pixel_scores[image_idx, ...]
+            mask = self.mask_vals[image_idx, ...]
             start_post_time = time.time()
             self.bboxes_det = get_bboxes(mask)
 
-            # mask = resize(mask)
-            # pixel_score = resize(pixel_score)
+            bboxes_new_order = []
+            for bbox in self.bboxes_det:
+                bbox = bbox.reshape(4, 2)
+                #find the index of upper-left (x+y is minimal)
+                upper_left = np.argmin(map(lambda x: x[0] + x[1], bbox))
+                upper_right = (upper_left + 1) % 4
+                down_left = (upper_left + 3) % 4
+                down_right = (upper_left + 2) % 4
 
-            return self.bboxes_det
+                bboxes_new_order.append(bbox[[upper_left, upper_right, down_left, down_right]].reshape(-1))
+
+            return bboxes_new_order
+
 
     def draw_bbox(self):
         def draw_bboxes(img, bboxes, color):
@@ -128,8 +152,54 @@ class pixelLinkDetector(object):
         return self.image_data
 
 
-if __name__ == "__main__":
-    pl = pixelLinkDetector("train/ic17_whole/model.ckpt-200000", 768, 768, 0.5, 0.7, 0.8)
-    print pl.detect("/Users/luoweimeng/Code/data/test/36.jpg")
+    def draw_pixel_score(self):
+        """
 
-    util.sit(pl.draw_bbox(), format='bgr', path='/Users/luoweimeng/Code/data/test_output/36.jpg')
+        :return: the map of pixel_score of original size: w * h
+        """
+        h, w, _ = self.image_data.shape
+
+        # resize to original size
+        def resize(img):
+            return util.img.resize(img, size=(w, h),
+                                   interpolation=cv2.INTER_NEAREST)
+        pixel_score = resize(self.pixel_scores[0])
+        return pixel_score
+
+
+    def draw_link_score(self, i):
+        """
+
+        :param i: direction 0:左上 1:上 2:右上 3:左 4:右 5:左下 6:下 7:右下
+
+        :return: the map of link_score at i th direction of original size: w * h
+        """
+        h, w, _ = self.image_data.shape
+
+        # resize to original size
+        def resize(img):
+            return util.img.resize(img, size=(w, h),
+                                   interpolation=cv2.INTER_NEAREST)
+
+        return resize(self.link_scores[0, :, :, i])
+
+    def draw_mask_vals(self):
+        """
+
+        :return: the map of mask values of original size: w * h
+        """
+        h, w, _ = self.image_data.shape
+
+        # resize to original size
+        def resize(img):
+            return util.img.resize(img, size=(w, h),
+                                   interpolation=cv2.INTER_NEAREST)
+
+        return resize(self.mask_vals[0])
+
+
+if __name__ == "__main__":
+    pl = pixelLinkDetector("/Users/luoweimeng/Code/data/test/40.jpg")
+    print pl.detect()
+
+    # util.sit(pl.draw_bbox(), format='bgr', path='/Users/luoweimeng/Code/data/test_output/40.jpg')
