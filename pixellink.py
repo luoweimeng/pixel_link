@@ -93,14 +93,14 @@ def load_pixel_link_model(checkpoint_dir, eval_image_height, eval_image_width,
     return sess, pl_net
 
 
-sess, pl_net = load_pixel_link_model("train/ic17_whole/model.ckpt-200000", 1280, 1280, 0.5, 0.7, 0.8)
+sess, pl_net = load_pixel_link_model("train/ic17_whole/model.ckpt-200000", 768, 768, 0.5, 0.7, 0.8)
 
 
 class pixelLinkDetector(object):
     def __init__(self, image_path):
         self.image_data = cv2.imread(image_path, cv2.IMREAD_COLOR)
 
-        # self.image_data, scale = resize_im(self.image_data, scale=768, max_scale=1280)
+        self.image_data, self.scale = resize_im(self.image_data, scale=768, max_scale=1280)
 
 
     def detect(self):
