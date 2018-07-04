@@ -1,24 +1,27 @@
-Code for the AAAI18 paper [PixelLink: Detecting Scene Text via Instance Segmentation](https://arxiv.org/abs/1801.01315), by Dan Deng, Haifeng Liu, Xuelong Li, and Deng Cai.
+# Scene Text Detection by Pixel Link
+## Detection on shopfront
+<p align = 'center'>
+<img src = 'samples/image1.png' width = '310px'>
+<img src = 'samples/image6.png' width = '310px'>
+<a href = 'samples/image2.png'><img src = 'samples/image2.png' width = '627px'></a>
+</p>
 
-Contributions to this repo are welcome, e.g., some other backbone networks (including the model definition and pretrained models).
+## Detection on menu
+<p align = 'center'>
+<img src = 'samples/image8.png' width = '627px'>
+<img src = 'samples/image9.png' width = '627px'>
+<a href = 'samples/image7.png'><img src = 'samples/image7.png' width = '627px'></a>
+</p>
 
-PLEASE CHECK EXSITING ISSUES BEFORE OPENNING YOUR OWN ONE. IF A SAME OR SIMILAR ISSUE HAD BEEN POSTED BEFORE, JUST REFER TO IT, AND DO NO OPEN A NEW ONE.
+Implementation for [PixelLink: Detecting Scene Text via Instance Segmentation](https://arxiv.org/abs/1801.01315), by Dan Deng, Haifeng Liu, Xuelong Li, and Deng Cai.
 
 # Installation
 ## Clone the repo
 ```
-git clone --recursive git@github.com:ZJULearning/pixel_link.git
-```
-
-Denote the root directory path of pixel_link by `${pixel_link_root}`. 
-
-Add the path of `${pixel_link_root}/pylib/src` to your `PYTHONPATH`:
-```
-export PYTHONPATH=${path_to_pixel_link}/pylib/src:$PYTHONPATH
+git clone git@github.com:luoweimeng/pixel_link.git
 ```
 
 ## Prerequisites
- (Only tested on) Ubuntu14.04 and 16.04 with:
 * Python 2.7
 * Tensorflow-gpu >= 1.1
 * opencv2
@@ -35,81 +38,50 @@ source activate pixel_link
 ```
 
 # Testing
-## Download the pretrained model
-* [PixelLink + VGG16 4s](https://pan.baidu.com/s/1jsOc-cutC4GyF-wMMyj5-w), trained on IC15
-* [PixelLink + VGG16 2s](https://pan.baidu.com/s/1asSFsRSgviU2GnvGt2lAUw), trained on IC15
-
-Unzip the downloaded model. It contains 4 files:
-
-* config.py
-* model.ckpt-xxx.data-00000-of-00001
-* model.ckpt-xxx.index  
-* model.ckpt-xxx.meta
-
-Denote their parent directory as `${model_path}`.
-
-## Test on ICDAR2015
-The reported results on ICDAR2015  are:
-
-|Model|Recall|Precision|F-mean|
-|---|---|---|---|
-|PixelLink+VGG16 2s|82.0|85.5|83.7|
-|PixelLink+VGG16 4s|81.7|82.9|82.3|
-
-Suppose you have downloaded the [ICDAR2015 dataset](http://rrc.cvc.uab.es/?ch=4&com=downloads), execute the following commands to test the model on ICDAR2015:
-```
-cd ${pixel_link_root}
-./scripts/test.sh ${GPU_ID} ${model_path}/model.ckpt-xxx ${path_to_icdar2015}/ch4_test_images
-```
-For example:
-```
-./scripts/test.sh 3 ~/temp/conv3_3/model.ckpt-38055 ~/dataset/ICDAR2015/Challenge4/ch4_test_images
-```
-
-The program will create a zip file of  detection results, which can be submitted to the ICDAR2015 server directly.
-The detection results can be visualized via `scripts/vis.sh`.
-
-Here are some samples:
-![./samples/img_333_pred.jpg](./samples/img_333_pred.jpg)
-![./samples/img_249_pred.jpg](./samples/img_249_pred.jpg)
-
 
 ## Test on any images
-Put the images to be tested in a single directory, i.e., `${image_dir}`. Then:
 ```
-cd ${pixel_link_root}
-./scripts/test_any.sh ${GPU_ID} ${model_path}/model.ckpt-xxx ${image_dir}
-```
-For example:
-```
- ./scripts/test_any.sh 3 ~/temp/conv3_3/model.ckpt-38055 ~/dataset/ICDAR2015/Challenge4/ch4_training_images
-```
+import matplotlib.pyplot as plt
+import pixellink
 
-The program will visualize the detection results directly on images.   If the detection result is not satisfying, try to:
+# Load the image
+pl = pixellink.pixelLinkDetector("/Users/luoweimeng/Code/data/test/40.jpg")
 
-1. Adjust the inference parameters like `eval_image_width`, `eval_image_height`, `pixel_conf_threshold`, `link_conf_threshold`.
-2. Or train your own model.
+# output bounding boxes, (x1, y1, x2, y2, x3, y3, x4, y4) top_left、top_right、bottom_left,bottom_right
+pl.detect()
+
+# output pixel score
+pixel_score = pl.draw_pixel_score()
+plt.imshow(pixel_score, cmap='gray')
+
+# output link score 0:top_left 1:top 2:top_right 3:left 4:right 5:bottom_left 6:bottom 7:bottem_right
+link_score = pl.draw_link_score(6)
+plt.imshow(link_score, cmap='gray')
+
+# drow the bounding boxes on the original image
+plt.imshow(pl.draw_bbox())
+```
 
 # Training
 ## Converting the dataset to tfrecords files
-Scripts for converting ICDAR2015 and SynthText datasets have been provided in the `datasets` directory.
+Scripts for converting ICDAR2017 / ICDAR2015 and SynthText datasets have been provided in the `datasets` directory.
  It not hard to write a converting script  for your own dataset.
 
 ## Train your own model
 
-* Modify `scripts/train.sh` to configure your dataset name and dataset path like:
 ```
-DATASET=icdar2015
-DATASET_DIR=$HOME/dataset/pixel_link/icdar2015
+python train_pixel_link.py \
+            --train_dir=/workdir/chengyuming/pixel_link/train/ic17_whole \
+            --num_gpus=1 \
+            --learning_rate=1e-3\
+            --gpu_memory_fraction=-1 \
+            --train_image_width=512 \
+            --train_image_height=512 \
+            --batch_size=16 \
+            --dataset_dir=/workdir/chengyuming/dataset/pixel_link/ICDAR \
+            --dataset_name=icdar2017 \
+            --dataset_split_name=train \
+            --max_number_of_steps=200000\
+            --checkpoint_path=/workdir/chengyuming/pixel_link/train/ic17/model.ckpt-151160 \
+            --using_moving_average=1
 ```
-* Start training
-```
-./scripts/train.sh ${GPU_IDs} ${IMG_PER_GPU}
-```
-For example, `./scripts/train.sh 0,1,2 8`. 
-
-The existing training strategy in `scripts/train.sh` is configured for icdar2015, modify it if necessary.  A lot of training or model options  are available in `config.py`, try it yourself if you are interested.
-
-# Acknowlegement
-![](http://www.cad.zju.edu.cn/templets/default/imgzd/logo.jpg)
-![](http://www.cvte.com/images/logo.png)
