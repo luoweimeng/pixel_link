@@ -15,6 +15,14 @@
 
 Implementation for [PixelLink: Detecting Scene Text via Instance Segmentation](https://arxiv.org/abs/1801.01315), by Dan Deng, Haifeng Liu, Xuelong Li, and Deng Cai.
 
+## Video Demonstration
+Here we transformed every frame in a video, then combined the results. [Click to go to the full demo on YouTube!](https://www.youtube.com/watch?v=RW0ClKG4lzY) 
+<div align = 'center'>
+     <a href = 'https://www.youtube.com/watch?v=RW0ClKG4lzY'>
+        <img src = 'samples/output_1662.png' alt = 'Text detection video. Click to go to YouTube!' width = '800px' height = '400px'>
+     </a>
+</div>
+
 # Installation
 ## Clone the repo
 ```
