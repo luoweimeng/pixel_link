@@ -9,7 +9,6 @@
 ## Detection on menu
 <p align = 'center'>
 <img src = 'samples/image8.png' width = '627px'>
-<img src = 'samples/image9.png' width = '627px'>
 <a href = 'samples/image7.png'><img src = 'samples/image7.png' width = '627px'></a>
 </p>
 
