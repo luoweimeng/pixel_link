@@ -18,7 +18,7 @@ Implementation for [PixelLink: Detecting Scene Text via Instance Segmentation](h
 Here we transformed every frame in a video, then combined the results. [Click to go to the full demo on YouTube!](https://www.youtube.com/watch?v=RW0ClKG4lzY) 
 <div align = 'center'>
      <a href = 'https://www.youtube.com/watch?v=RW0ClKG4lzY'>
-        <img src = 'samples/output_1662.png' alt = 'Text detection video. Click to go to YouTube!' width = '800px' height = '400px'>
+        <img src = 'samples/screen.png' alt = 'Text detection video. Click to go to YouTube!' width = '800px' height = '400px'>
      </a>
 </div>
 
